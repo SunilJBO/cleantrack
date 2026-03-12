@@ -7,7 +7,7 @@ export type OrderStatus =
   | "returning_to_store"
   | "ready_for_pickup";
 
-export type StaffRole = "store" | "driver" | "plant";
+export type StaffRole = "store" | "driver" | "plant" | "admin";
 
 export type LogAction =
   | "created"

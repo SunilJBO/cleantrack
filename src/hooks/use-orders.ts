@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import type { Order, OrderStatus } from "../types";
+import type { OrderStatus } from "../types";
 import {
   getAllOrders,
   getOrderById,
@@ -11,11 +11,14 @@ import {
   searchOrders as searchOrdersData,
 } from "../data";
 import { isOverdue } from "../lib/utils";
+import { useDataRefresh } from "../context/data-refresh-context";
 
 export function useOrders(filters?: {
   status?: OrderStatus | "all" | "overdue";
   search?: string;
 }) {
+  const { refreshKey } = useDataRefresh();
+
   const orders = useMemo(() => {
     let result = getAllOrders();
 
@@ -32,31 +35,35 @@ export function useOrders(filters?: {
     }
 
     return result;
-  }, [filters?.status, filters?.search]);
+  }, [filters?.status, filters?.search, refreshKey]);
 
   return orders;
 }
 
 export function useOrderById(id: string) {
-  return useMemo(() => getOrderById(id), [id]);
+  const { refreshKey } = useDataRefresh();
+  return useMemo(() => getOrderById(id), [id, refreshKey]);
 }
 
 export function useOrderItems(orderId: string) {
-  return useMemo(() => getItemsByOrderId(orderId), [orderId]);
+  const { refreshKey } = useDataRefresh();
+  return useMemo(() => getItemsByOrderId(orderId), [orderId, refreshKey]);
 }
 
 export function useOrderLogs(orderId: string) {
-  return useMemo(() => getLogsByOrderId(orderId), [orderId]);
+  const { refreshKey } = useDataRefresh();
+  return useMemo(() => getLogsByOrderId(orderId), [orderId, refreshKey]);
 }
 
 export function useMetrics() {
+  const { refreshKey } = useDataRefresh();
   return useMemo(
     () => ({
       atPlant: getOrdersAtPlant().length,
       dueToday: getOrdersDueToday().length,
       overdue: getOverdueOrders().length,
     }),
-    []
+    [refreshKey]
   );
 }
 

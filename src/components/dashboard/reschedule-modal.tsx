@@ -3,7 +3,6 @@ import { format } from "date-fns";
 import { Modal } from "../ui/modal";
 import { DatePicker } from "../ui/date-picker";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import type { Order } from "../../types";
 
 interface RescheduleModalProps {
@@ -21,13 +20,6 @@ export function RescheduleModal({
 }: RescheduleModalProps) {
   const [date, setDate] = useState("");
   const [reason, setReason] = useState("");
-
-  const handleOpen = () => {
-    if (order) {
-      setDate(format(new Date(order.dueDate), "yyyy-MM-dd"));
-      setReason("");
-    }
-  };
 
   const handleSave = () => {
     if (!order || !date) return;

@@ -71,6 +71,7 @@ export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
   store: "Store Staff",
   driver: "Driver",
   plant: "Plant Staff",
+  admin: "Admin",
 };
 
 export const ITEM_TYPES = [

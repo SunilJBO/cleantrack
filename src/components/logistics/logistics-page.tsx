@@ -1,30 +1,100 @@
 import { useState } from "react";
-import { Truck, ArrowRight, Check, Package } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Truck, ArrowRight, Check } from "lucide-react";
 import { GlassCard } from "../ui/glass-card";
 import { Button } from "../ui/button";
 import { ScannerInput } from "../ui/scanner-input";
 import { Badge } from "../ui/badge";
 import { useOrders } from "../../hooks/use-orders";
+import { useAuth } from "../../hooks/use-auth";
+import { updateOrderStatus, addLog } from "../../data";
 import { cn } from "../../lib/utils";
 
 type Mode = "transfer" | "delivery";
 
 export function LogisticsPage() {
+  const navigate = useNavigate();
+  const { currentStaff } = useAuth();
   const [mode, setMode] = useState<Mode>("transfer");
-  const [scannedIds, setScannedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [scanValue, setScanValue] = useState("");
+  const [completed, setCompleted] = useState(false);
 
   const transferOrders = useOrders({ status: "dropped_off" });
   const deliveryOrders = useOrders({ status: "completed_at_plant" });
   const orders = mode === "transfer" ? transferOrders : deliveryOrders;
 
   const handleScan = (invoice: string) => {
-    const found = orders.find((o) => o.invoiceNumber === invoice);
+    const found = orders.find(
+      (o) => o.invoiceNumber.toLowerCase() === invoice.toLowerCase().trim()
+    );
     if (found) {
-      setScannedIds((prev) => new Set(prev).add(found._id));
+      setSelectedIds((prev) => new Set(prev).add(found._id));
     }
     setScanValue("");
   };
+
+  const toggleOrder = (orderId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) {
+        next.delete(orderId);
+      } else {
+        next.add(orderId);
+      }
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (selectedIds.size === orders.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(orders.map((o) => o._id)));
+    }
+  };
+
+  const handleComplete = () => {
+    const newStatus = mode === "transfer" ? "transfer_to_plant" : "returning_to_store";
+    const location = "In Transit";
+    const action = mode === "transfer" ? "transferred_out" : "collected_from_plant";
+
+    selectedIds.forEach((orderId) => {
+      updateOrderStatus(orderId, newStatus, location);
+      if (currentStaff) {
+        addLog({
+          orderId,
+          staffId: currentStaff._id,
+          action,
+          timestamp: Date.now(),
+          location,
+        });
+      }
+    });
+
+    setCompleted(true);
+    setTimeout(() => {
+      setSelectedIds(new Set());
+      setCompleted(false);
+      navigate("/");
+    }, 1500);
+  };
+
+  if (completed) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="h-20 w-20 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
+          <Check size={40} className="text-emerald-400" />
+        </div>
+        <h2 className="font-heading text-xl font-semibold text-white">
+          {mode === "transfer" ? "Transfer" : "Delivery"} Complete!
+        </h2>
+        <p className="text-sm text-slate-400 mt-2">
+          {selectedIds.size} order{selectedIds.size !== 1 ? "s" : ""} updated
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -33,7 +103,7 @@ export function LogisticsPage() {
           Logistics
         </h1>
         <p className="text-sm text-slate-400 mt-1">
-          Scan and verify orders for transfer or delivery
+          Select orders to transfer or deliver
         </p>
       </div>
 
@@ -43,7 +113,7 @@ export function LogisticsPage() {
           variant={mode === "transfer" ? "primary" : "secondary"}
           onClick={() => {
             setMode("transfer");
-            setScannedIds(new Set());
+            setSelectedIds(new Set());
           }}
         >
           <Truck size={18} />
@@ -53,7 +123,7 @@ export function LogisticsPage() {
           variant={mode === "delivery" ? "primary" : "secondary"}
           onClick={() => {
             setMode("delivery");
-            setScannedIds(new Set());
+            setSelectedIds(new Set());
           }}
         >
           <ArrowRight size={18} />
@@ -77,9 +147,19 @@ export function LogisticsPage() {
           <h2 className="text-sm font-semibold text-white">
             {mode === "transfer" ? "Transfer" : "Delivery"} Checklist
           </h2>
-          <span className="text-xs text-slate-400">
-            {scannedIds.size}/{orders.length} verified
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400">
+              {selectedIds.size}/{orders.length} selected
+            </span>
+            {orders.length > 0 && (
+              <button
+                onClick={selectAll}
+                className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+              >
+                {selectedIds.size === orders.length ? "Deselect All" : "Select All"}
+              </button>
+            )}
+          </div>
         </div>
 
         {orders.length === 0 ? (
@@ -89,21 +169,24 @@ export function LogisticsPage() {
         ) : (
           <div className="space-y-2">
             {orders.map((order) => {
-              const checked = scannedIds.has(order._id);
+              const checked = selectedIds.has(order._id);
               return (
                 <div
                   key={order._id}
+                  onClick={() => toggleOrder(order._id)}
                   className={cn(
-                    "flex items-center gap-3 p-3 rounded-xl transition-all",
-                    checked ? "bg-emerald-500/10" : "bg-white/5"
+                    "flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer",
+                    checked
+                      ? "bg-emerald-500/10 border border-emerald-500/20"
+                      : "bg-white/5 border border-transparent hover:bg-white/8"
                   )}
                 >
                   <div
                     className={cn(
-                      "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all",
+                      "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
                       checked
                         ? "bg-emerald-500 border-emerald-500"
-                        : "border-white/20"
+                        : "border-white/20 hover:border-white/40"
                     )}
                   >
                     {checked && <Check size={14} className="text-white" />}
@@ -123,11 +206,11 @@ export function LogisticsPage() {
           </div>
         )}
 
-        {scannedIds.size > 0 && scannedIds.size === orders.length && (
+        {selectedIds.size > 0 && (
           <div className="mt-4 pt-4 border-t border-white/8">
-            <Button className="w-full" size="lg">
+            <Button className="w-full" size="lg" onClick={handleComplete}>
               <Check size={18} />
-              Complete {mode === "transfer" ? "Transfer" : "Delivery"}
+              Complete {mode === "transfer" ? "Transfer" : "Delivery"} ({selectedIds.size})
             </Button>
           </div>
         )}

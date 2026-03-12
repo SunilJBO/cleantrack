@@ -74,4 +74,79 @@ export function getStaffByPin(pin: string): Staff | undefined {
   return mockStaff.find((s) => s.pin === pin);
 }
 
+// --- Mutation helpers (mock persistence, in-memory only) ---
+
+let idCounter = Date.now();
+function generateId(prefix: string) {
+  return `${prefix}_${++idCounter}`;
+}
+
+export function addOrder(data: Omit<Order, "_id" | "createdAt" | "updatedAt">): Order {
+  const now = Date.now();
+  const order: Order = {
+    ...data,
+    _id: generateId("order"),
+    createdAt: now,
+    updatedAt: now,
+  };
+  mockOrders.unshift(order);
+  return order;
+}
+
+export function addItems(items: Omit<Item, "_id">[]): Item[] {
+  const created = items.map((item) => ({
+    ...item,
+    _id: generateId("item"),
+  }));
+  mockItems.push(...created);
+  return created;
+}
+
+export function addLog(data: Omit<LogEntry, "_id">): LogEntry {
+  const log: LogEntry = {
+    ...data,
+    _id: generateId("log"),
+  };
+  mockLogs.push(log);
+  return log;
+}
+
+export function updateOrderStatus(
+  orderId: string,
+  status: OrderStatus,
+  location: string
+): Order | undefined {
+  const order = mockOrders.find((o) => o._id === orderId);
+  if (order) {
+    order.status = status;
+    order.location = location;
+    order.updatedAt = Date.now();
+  }
+  return order;
+}
+
+export function getItemById(itemId: string): Item | undefined {
+  return mockItems.find((i) => i._id === itemId);
+}
+
+export function updateItemDefect(itemId: string, defect: string): Item | undefined {
+  const item = mockItems.find((i) => i._id === itemId);
+  if (item) {
+    item.defects.push(defect);
+  }
+  return item;
+}
+
+export function addItemPhotos(
+  itemId: string,
+  photoUrls: string[],
+  photoType: "initialPhotos" | "plantPhotos" | "completionPhotos"
+): Item | undefined {
+  const item = mockItems.find((i) => i._id === itemId);
+  if (item) {
+    item[photoType].push(...photoUrls);
+  }
+  return item;
+}
+
 export { mockOrders, mockItems, mockLogs, mockStaff };

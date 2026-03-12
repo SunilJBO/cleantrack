@@ -1,12 +1,12 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Package, MapPin, Clock, User } from "lucide-react";
+import { ArrowLeft, Package, MapPin, Clock } from "lucide-react";
 import { GlassCard } from "../ui/glass-card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { PhotoGrid } from "../ui/photo-grid";
 import { useOrderById, useOrderItems, useOrderLogs } from "../../hooks/use-orders";
 import { formatDate, formatDateTime } from "../../lib/utils";
-import { ORDER_STATUS_LABELS, STAGE_ORDER } from "../../lib/constants";
+import { STAGE_ORDER } from "../../lib/constants";
 import { getStaffById } from "../../data";
 import { cn } from "../../lib/utils";
 
@@ -146,6 +146,24 @@ export function OrderDetailPage() {
                         {d}
                       </span>
                     ))}
+                  </div>
+                )}
+                {item.initialPhotos.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-slate-500 mb-1">Drop-off Photos</p>
+                    <PhotoGrid photos={item.initialPhotos} />
+                  </div>
+                )}
+                {item.plantPhotos.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-slate-500 mb-1">Plant Inspection</p>
+                    <PhotoGrid photos={item.plantPhotos} />
+                  </div>
+                )}
+                {item.completionPhotos.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-slate-500 mb-1">Completion</p>
+                    <PhotoGrid photos={item.completionPhotos} />
                   </div>
                 )}
               </div>

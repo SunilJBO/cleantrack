@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Order } from "../../types";
+import { StoreReceiveSection } from "./store-receive-section";
 import { MetricsRow } from "./metrics-row";
 import { OrderList } from "./order-list";
 import { RescheduleModal } from "./reschedule-modal";
@@ -19,6 +20,8 @@ export function DashboardPage() {
           Overview of all active orders
         </p>
       </div>
+
+      <StoreReceiveSection />
 
       <MetricsRow />
 

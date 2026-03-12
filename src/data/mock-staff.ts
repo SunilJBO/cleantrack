@@ -7,4 +7,5 @@ export const mockStaff: Staff[] = [
   { _id: "staff_004", name: "Aisha Patel", role: "driver", pin: "2222" },
   { _id: "staff_005", name: "Tom Williams", role: "plant", pin: "3333" },
   { _id: "staff_006", name: "Lina Nakamura", role: "plant", pin: "4444" },
+  { _id: "staff_007", name: "Sunil (Admin)", role: "admin", pin: "0000" },
 ];

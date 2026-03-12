@@ -1,5 +1,4 @@
 import { cn } from "../../lib/utils";
-import { ORDER_STATUS_LABELS } from "../../lib/constants";
 import type { OrderStatus } from "../../types";
 
 type FilterValue = OrderStatus | "all" | "overdue";

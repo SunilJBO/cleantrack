@@ -1,5 +1,6 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AuthProvider } from "./context/auth-context";
+import { DataRefreshProvider } from "./context/data-refresh-context";
 import { AppShell } from "./components/layout/app-shell";
 import { PinLoginPage } from "./components/auth/pin-login-page";
 import { DashboardPage } from "./components/dashboard/dashboard-page";
@@ -28,9 +29,11 @@ const router = createBrowserRouter([
 
 function App() {
   return (
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <DataRefreshProvider>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </DataRefreshProvider>
   );
 }
 
