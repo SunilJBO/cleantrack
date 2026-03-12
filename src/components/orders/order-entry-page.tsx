@@ -1,0 +1,128 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Trash2 } from "lucide-react";
+import { GlassCard } from "../ui/glass-card";
+import { ScannerInput } from "../ui/scanner-input";
+import { Input } from "../ui/input";
+import { DatePicker } from "../ui/date-picker";
+import { Button } from "../ui/button";
+import { ITEM_TYPES } from "../../lib/constants";
+
+interface NewItem {
+  type: string;
+  notes: string;
+}
+
+export function OrderEntryPage() {
+  const navigate = useNavigate();
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [items, setItems] = useState<NewItem[]>([{ type: "Shirt", notes: "" }]);
+
+  const addItem = () => setItems([...items, { type: "Shirt", notes: "" }]);
+
+  const removeItem = (index: number) =>
+    setItems(items.filter((_, i) => i !== index));
+
+  const updateItem = (index: number, field: keyof NewItem, value: string) =>
+    setItems(items.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+
+  const handleSubmit = () => {
+    alert(
+      `Order created!\n\nInvoice: ${invoiceNumber}\nCustomer: ${customerName}\nDue: ${dueDate}\nItems: ${items.length}`
+    );
+    navigate("/");
+  };
+
+  return (
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <div>
+        <h1 className="font-heading text-2xl font-semibold text-white">
+          New Order
+        </h1>
+        <p className="text-sm text-slate-400 mt-1">
+          Record a new drop-off order
+        </p>
+      </div>
+
+      <GlassCard>
+        <div className="space-y-4">
+          <ScannerInput
+            value={invoiceNumber}
+            onChange={setInvoiceNumber}
+            onSubmit={setInvoiceNumber}
+            placeholder="Scan or enter invoice number"
+          />
+
+          <Input
+            label="Customer Name (optional)"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="John Smith"
+          />
+
+          <DatePicker
+            label="Due Date"
+            value={dueDate}
+            onChange={setDueDate}
+          />
+        </div>
+      </GlassCard>
+
+      <GlassCard>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-white">Items</h2>
+            <Button variant="ghost" size="sm" onClick={addItem}>
+              <Plus size={16} />
+              Add Item
+            </Button>
+          </div>
+
+          {items.map((item, i) => (
+            <div key={i} className="flex gap-3 items-start">
+              <select
+                value={item.type}
+                onChange={(e) => updateItem(i, "type", e.target.value)}
+                className="flex-1 rounded-xl bg-white/8 border border-white/12 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 [color-scheme:dark]"
+              >
+                {ITEM_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <Input
+                value={item.notes}
+                onChange={(e) => updateItem(i, "notes", e.target.value)}
+                placeholder="Notes..."
+                className="flex-1"
+              />
+              {items.length > 1 && (
+                <button
+                  onClick={() => removeItem(i)}
+                  className="p-2.5 text-slate-500 hover:text-red-400 transition-colors"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </GlassCard>
+
+      <div className="flex gap-3 justify-end">
+        <Button variant="ghost" onClick={() => navigate("/")}>
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={!invoiceNumber || !dueDate}
+        >
+          Create Order
+        </Button>
+      </div>
+    </div>
+  );
+}
