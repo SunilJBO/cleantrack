@@ -1,27 +1,25 @@
 import { useState } from "react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Doc } from "../../../convex/_generated/dataModel";
 import { Modal } from "../ui/modal";
 import { Button } from "../ui/button";
 import { PhotoUpload } from "../ui/photo-upload";
-import { useDataRefresh } from "../../context/data-refresh-context";
-import { addItemPhotos } from "../../data";
-import type { Item } from "../../types";
 
 interface PhotoModalProps {
-  item: Item;
+  item: Doc<"items">;
   orderId: string;
   onClose: () => void;
 }
 
 export function PhotoModal({ item, onClose }: PhotoModalProps) {
-  const { refresh } = useDataRefresh();
+  const addPhotos = useMutation(api.items.addPhotos);
   const [photos, setPhotos] = useState<string[]>([...item.plantPhotos]);
 
-  const handleSave = () => {
-    // Find new photos that weren't already on the item
+  const handleSave = async () => {
     const newPhotos = photos.filter((p) => !item.plantPhotos.includes(p));
     if (newPhotos.length > 0) {
-      addItemPhotos(item._id, newPhotos, "plantPhotos");
-      refresh();
+      await addPhotos({ id: item._id, photos: newPhotos, photoType: "plantPhotos" });
     }
     onClose();
   };

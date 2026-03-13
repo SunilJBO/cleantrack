@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { Check, PackageCheck } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { GlassCard } from "../ui/glass-card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { useOrders } from "../../hooks/use-orders";
 import { useAuth } from "../../hooks/use-auth";
-import { useDataRefresh } from "../../context/data-refresh-context";
-import { updateOrderStatus, addLog } from "../../data";
 import { cn } from "../../lib/utils";
 
 export function StoreReceiveSection() {
   const { currentStaff } = useAuth();
-  const { refresh } = useDataRefresh();
+  const updateOrderStatus = useMutation(api.orders.updateStatus);
+  const createLog = useMutation(api.logs.create);
   const returningOrders = useOrders({ status: "returning_to_store" });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [completed, setCompleted] = useState(false);
@@ -35,27 +37,26 @@ export function StoreReceiveSection() {
     }
   };
 
-  const handleMarkReady = () => {
-    selectedIds.forEach((orderId) => {
-      updateOrderStatus(orderId, "ready_for_pickup", "Store A");
+  const handleMarkReady = async () => {
+    for (const orderId of selectedIds) {
+      await updateOrderStatus({ id: orderId as Id<"orders">, status: "ready_for_pickup", location: "Store A" });
       if (currentStaff) {
-        addLog({
-          orderId,
+        await createLog({
+          orderId: orderId as Id<"orders">,
           staffId: currentStaff._id,
           action: "returned_to_store",
           timestamp: Date.now(),
           location: "Store A",
         });
-        addLog({
-          orderId,
+        await createLog({
+          orderId: orderId as Id<"orders">,
           staffId: currentStaff._id,
           action: "ready_for_pickup",
           timestamp: Date.now() + 1,
           location: "Store A",
         });
       }
-    });
-    refresh();
+    }
     setCompleted(true);
     setTimeout(() => {
       setSelectedIds(new Set());

@@ -1,5 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Package, MapPin, Clock } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { GlassCard } from "../ui/glass-card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -7,7 +9,6 @@ import { PhotoGrid } from "../ui/photo-grid";
 import { useOrderById, useOrderItems, useOrderLogs } from "../../hooks/use-orders";
 import { formatDate, formatDateTime } from "../../lib/utils";
 import { STAGE_ORDER } from "../../lib/constants";
-import { getStaffById } from "../../data";
 import { cn } from "../../lib/utils";
 
 export function OrderDetailPage() {
@@ -16,6 +17,8 @@ export function OrderDetailPage() {
   const order = useOrderById(orderId!);
   const items = useOrderItems(orderId!);
   const logs = useOrderLogs(orderId!);
+  const allStaff = useQuery(api.staff.list) ?? [];
+  const staffMap = new Map(allStaff.map((s) => [s._id, s]));
 
   if (!order) {
     return (
@@ -92,7 +95,7 @@ export function OrderDetailPage() {
         <h2 className="text-sm font-semibold text-white mb-3">Activity Log</h2>
         <div className="space-y-3">
           {logs.map((log) => {
-            const staff = getStaffById(log.staffId);
+            const staff = staffMap.get(log.staffId);
             return (
               <div key={log._id} className="flex gap-3 text-sm">
                 <div className="w-2 h-2 rounded-full bg-primary-400 mt-1.5 shrink-0" />

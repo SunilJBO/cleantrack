@@ -13,10 +13,11 @@
 - [x] Logistics page — transfer/delivery toggle, scan-verify checklist
 - [x] Plant processing page — expandable orders, item management
 - [x] Initial commit to GitHub
+- [x] Connect Convex backend (schema, queries, mutations)
+- [x] Wire up real-time data sync (ConvexProvider + useQuery/useMutation)
+- [x] Seed staff data to Convex database
 
 ## Next Steps
-- [ ] Connect Convex backend (replace mock data layer)
-- [ ] Wire up real-time data sync
 - [ ] Implement photo capture/upload with Convex file storage
 - [ ] Add barcode scanning library integration
 - [ ] Session persistence (remember logged-in staff)
@@ -25,8 +26,10 @@
 - [ ] Offline support for drivers
 - [ ] Role-based access control (restrict screens by role)
 - [ ] Data retention/archival for completed orders
+- [ ] Reschedule mutation (currently client-side only)
+- [ ] Clean up legacy mock data files in src/data/
 
 ## Known Issues
-- Reschedule saves in-memory only (resets on refresh) — will persist with Convex
+- Reschedule saves in-memory only (needs Convex mutation)
 - Scanner mode shows placeholder (camera integration pending)
 - Photo grids use empty arrays (no actual images yet)

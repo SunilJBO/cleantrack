@@ -9,24 +9,141 @@ import {
   Play,
   CheckCircle2,
 } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { GlassCard } from "../ui/glass-card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScannerInput } from "../ui/scanner-input";
-import { useOrders } from "../../hooks/use-orders";
+import { useOrders, useOrderItems } from "../../hooks/use-orders";
 import { useAuth } from "../../hooks/use-auth";
-import { useDataRefresh } from "../../context/data-refresh-context";
-import { getItemsByOrderId, updateOrderStatus, addLog } from "../../data";
 import { cn, formatRelativeDate, isOverdue } from "../../lib/utils";
 import { DefectModal } from "./defect-modal";
 import { PhotoModal } from "./photo-modal";
-import type { Order, Item } from "../../types";
 
 type Tab = "receive" | "process" | "completed";
 
+function PlantOrderCard({
+  order,
+  showActions,
+  isExpanded,
+  onToggleExpand,
+  onStartProcessing,
+  onMarkComplete,
+  onDefect,
+  onPhoto,
+}: {
+  order: Doc<"orders">;
+  showActions: boolean;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onStartProcessing: () => void;
+  onMarkComplete: () => void;
+  onDefect: (item: Doc<"items">) => void;
+  onPhoto: (item: Doc<"items">) => void;
+}) {
+  const items = useOrderItems(order._id);
+  const overdue = isOverdue(order.dueDate, order.status);
+
+  return (
+    <GlassCard className="p-4">
+      <div
+        className="flex items-center gap-3 cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-semibold text-white">
+              {order.invoiceNumber}
+            </span>
+            <Badge status={order.status} dueDate={order.dueDate} />
+          </div>
+          <p className="text-xs text-slate-400">
+            {order.customerName} · {items.length} items ·{" "}
+            <span className={overdue ? "text-red-400" : ""}>
+              {formatRelativeDate(order.dueDate)}
+            </span>
+          </p>
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div className="mt-4 pt-4 border-t border-white/8 space-y-3">
+          {items.map((item) => (
+            <div
+              key={item._id}
+              className="flex items-start gap-3 p-3 rounded-xl bg-white/5"
+            >
+              <Package size={16} className="text-slate-400 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm text-white">{item.type}</p>
+                {item.notes && (
+                  <p className="text-xs text-slate-400">{item.notes}</p>
+                )}
+                {item.defects.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {item.defects.map((d, i) => (
+                      <span
+                        key={i}
+                        className="text-xs bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full"
+                      >
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {showActions && (
+                <div className="flex gap-1 shrink-0">
+                  <button
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
+                    title="Add defect note"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDefect(item);
+                    }}
+                  >
+                    <AlertCircle size={14} />
+                  </button>
+                  <button
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-primary-400 hover:bg-primary-500/10 transition-all"
+                    title="Add photo"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPhoto(item);
+                    }}
+                  >
+                    <Camera size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {showActions && order.status === "at_plant" && (
+            <Button className="w-full" onClick={onStartProcessing}>
+              <Play size={16} />
+              Start Processing
+            </Button>
+          )}
+
+          {showActions && order.status === "processing" && (
+            <Button className="w-full" onClick={onMarkComplete}>
+              <Check size={16} />
+              Mark All Complete
+            </Button>
+          )}
+        </div>
+      )}
+    </GlassCard>
+  );
+}
+
 export function PlantPage() {
   const { currentStaff } = useAuth();
-  const { refresh } = useDataRefresh();
+  const updateOrderStatus = useMutation(api.orders.updateStatus);
+  const createLog = useMutation(api.logs.create);
 
   const inTransit = useOrders({ status: "transfer_to_plant" });
   const atPlant = useOrders({ status: "at_plant" });
@@ -42,8 +159,8 @@ export function PlantPage() {
   const [receiveComplete, setReceiveComplete] = useState(false);
 
   // Modal state
-  const [defectItem, setDefectItem] = useState<{ item: Item; orderId: string } | null>(null);
-  const [photoItem, setPhotoItem] = useState<{ item: Item; orderId: string } | null>(null);
+  const [defectItem, setDefectItem] = useState<{ item: Doc<"items">; orderId: string } | null>(null);
+  const [photoItem, setPhotoItem] = useState<{ item: Doc<"items">; orderId: string } | null>(null);
 
   // --- Receive tab handlers ---
   const handleScan = (invoice: string) => {
@@ -73,20 +190,19 @@ export function PlantPage() {
     }
   };
 
-  const handleConfirmReceipt = () => {
-    selectedIds.forEach((orderId) => {
-      updateOrderStatus(orderId, "at_plant", "Plant");
+  const handleConfirmReceipt = async () => {
+    for (const orderId of selectedIds) {
+      await updateOrderStatus({ id: orderId as Id<"orders">, status: "at_plant", location: "Plant" });
       if (currentStaff) {
-        addLog({
-          orderId,
+        await createLog({
+          orderId: orderId as Id<"orders">,
           staffId: currentStaff._id,
           action: "plant_received",
           timestamp: Date.now(),
           location: "Plant",
         });
       }
-    });
-    refresh();
+    }
     setReceiveComplete(true);
     setTimeout(() => {
       setSelectedIds(new Set());
@@ -96,10 +212,10 @@ export function PlantPage() {
   };
 
   // --- Process tab handlers ---
-  const handleStartProcessing = (order: Order) => {
-    updateOrderStatus(order._id, "processing", "Plant");
+  const handleStartProcessing = async (order: Doc<"orders">) => {
+    await updateOrderStatus({ id: order._id, status: "processing", location: "Plant" });
     if (currentStaff) {
-      addLog({
+      await createLog({
         orderId: order._id,
         staffId: currentStaff._id,
         action: "processing_started",
@@ -107,13 +223,12 @@ export function PlantPage() {
         location: "Plant",
       });
     }
-    refresh();
   };
 
-  const handleMarkComplete = (order: Order) => {
-    updateOrderStatus(order._id, "completed_at_plant", "Plant");
+  const handleMarkComplete = async (order: Doc<"orders">) => {
+    await updateOrderStatus({ id: order._id, status: "completed_at_plant", location: "Plant" });
     if (currentStaff) {
-      addLog({
+      await createLog({
         orderId: order._id,
         staffId: currentStaff._id,
         action: "completed",
@@ -121,107 +236,6 @@ export function PlantPage() {
         location: "Plant",
       });
     }
-    refresh();
-  };
-
-  // --- Shared order card renderer ---
-  const renderOrderCard = (order: Order, showActions: boolean) => {
-    const items = getItemsByOrderId(order._id);
-    const isExpanded = expandedOrder === order._id;
-    const overdue = isOverdue(order.dueDate, order.status);
-
-    return (
-      <GlassCard key={order._id} className="p-4">
-        <div
-          className="flex items-center gap-3 cursor-pointer"
-          onClick={() => setExpandedOrder(isExpanded ? null : order._id)}
-        >
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-semibold text-white">
-                {order.invoiceNumber}
-              </span>
-              <Badge status={order.status} dueDate={order.dueDate} />
-            </div>
-            <p className="text-xs text-slate-400">
-              {order.customerName} · {items.length} items ·{" "}
-              <span className={overdue ? "text-red-400" : ""}>
-                {formatRelativeDate(order.dueDate)}
-              </span>
-            </p>
-          </div>
-        </div>
-
-        {isExpanded && (
-          <div className="mt-4 pt-4 border-t border-white/8 space-y-3">
-            {items.map((item) => (
-              <div
-                key={item._id}
-                className="flex items-start gap-3 p-3 rounded-xl bg-white/5"
-              >
-                <Package size={16} className="text-slate-400 mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm text-white">{item.type}</p>
-                  {item.notes && (
-                    <p className="text-xs text-slate-400">{item.notes}</p>
-                  )}
-                  {item.defects.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {item.defects.map((d, i) => (
-                        <span
-                          key={i}
-                          className="text-xs bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full"
-                        >
-                          {d}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {showActions && (
-                  <div className="flex gap-1 shrink-0">
-                    <button
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
-                      title="Add defect note"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDefectItem({ item, orderId: order._id });
-                      }}
-                    >
-                      <AlertCircle size={14} />
-                    </button>
-                    <button
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-primary-400 hover:bg-primary-500/10 transition-all"
-                      title="Add photo"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPhotoItem({ item, orderId: order._id });
-                      }}
-                    >
-                      <Camera size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {showActions && order.status === "at_plant" && (
-              <Button className="w-full" onClick={() => handleStartProcessing(order)}>
-                <Play size={16} />
-                Start Processing
-              </Button>
-            )}
-
-            {showActions && order.status === "processing" && (
-              <Button className="w-full" onClick={() => handleMarkComplete(order)}>
-                <Check size={16} />
-                Mark All Complete
-              </Button>
-            )}
-          </div>
-        )}
-      </GlassCard>
-    );
   };
 
   return (
@@ -396,7 +410,19 @@ export function PlantPage() {
               </p>
             </GlassCard>
           ) : (
-            [...atPlant, ...processing].map((order) => renderOrderCard(order, true))
+            [...atPlant, ...processing].map((order) => (
+              <PlantOrderCard
+                key={order._id}
+                order={order}
+                showActions={true}
+                isExpanded={expandedOrder === order._id}
+                onToggleExpand={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)}
+                onStartProcessing={() => handleStartProcessing(order)}
+                onMarkComplete={() => handleMarkComplete(order)}
+                onDefect={(item) => setDefectItem({ item, orderId: order._id })}
+                onPhoto={(item) => setPhotoItem({ item, orderId: order._id })}
+              />
+            ))
           )}
         </div>
       )}
@@ -411,7 +437,19 @@ export function PlantPage() {
               </p>
             </GlassCard>
           ) : (
-            completed.map((order) => renderOrderCard(order, false))
+            completed.map((order) => (
+              <PlantOrderCard
+                key={order._id}
+                order={order}
+                showActions={false}
+                isExpanded={expandedOrder === order._id}
+                onToggleExpand={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)}
+                onStartProcessing={() => {}}
+                onMarkComplete={() => {}}
+                onDefect={(item) => setDefectItem({ item, orderId: order._id })}
+                onPhoto={(item) => setPhotoItem({ item, orderId: order._id })}
+              />
+            ))
           )}
         </div>
       )}

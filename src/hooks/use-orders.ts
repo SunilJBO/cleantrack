@@ -1,70 +1,44 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import type { OrderStatus } from "../types";
-import {
-  getAllOrders,
-  getOrderById,
-  getOrdersAtPlant,
-  getOrdersDueToday,
-  getOverdueOrders,
-  getItemsByOrderId,
-  getLogsByOrderId,
-  searchOrders as searchOrdersData,
-} from "../data";
-import { isOverdue } from "../lib/utils";
-import { useDataRefresh } from "../context/data-refresh-context";
+import type { Id } from "../../convex/_generated/dataModel";
 
 export function useOrders(filters?: {
   status?: OrderStatus | "all" | "overdue";
   search?: string;
 }) {
-  const { refreshKey } = useDataRefresh();
-
-  const orders = useMemo(() => {
-    let result = getAllOrders();
-
-    if (filters?.search) {
-      result = searchOrdersData(filters.search);
-    }
-
-    if (filters?.status && filters.status !== "all") {
-      if (filters.status === "overdue") {
-        result = result.filter((o) => isOverdue(o.dueDate, o.status));
-      } else {
-        result = result.filter((o) => o.status === filters.status);
-      }
-    }
-
-    return result;
-  }, [filters?.status, filters?.search, refreshKey]);
-
-  return orders;
+  const orders = useQuery(api.orders.list, {
+    status: filters?.status,
+    search: filters?.search,
+  });
+  return orders ?? [];
 }
 
 export function useOrderById(id: string) {
-  const { refreshKey } = useDataRefresh();
-  return useMemo(() => getOrderById(id), [id, refreshKey]);
+  const order = useQuery(api.orders.getById, {
+    id: id as Id<"orders">,
+  });
+  return order ?? undefined;
 }
 
 export function useOrderItems(orderId: string) {
-  const { refreshKey } = useDataRefresh();
-  return useMemo(() => getItemsByOrderId(orderId), [orderId, refreshKey]);
+  const items = useQuery(api.items.getByOrderId, {
+    orderId: orderId as Id<"orders">,
+  });
+  return items ?? [];
 }
 
 export function useOrderLogs(orderId: string) {
-  const { refreshKey } = useDataRefresh();
-  return useMemo(() => getLogsByOrderId(orderId), [orderId, refreshKey]);
+  const logs = useQuery(api.logs.getByOrderId, {
+    orderId: orderId as Id<"orders">,
+  });
+  return logs ?? [];
 }
 
 export function useMetrics() {
-  const { refreshKey } = useDataRefresh();
-  return useMemo(
-    () => ({
-      atPlant: getOrdersAtPlant().length,
-      dueToday: getOrdersDueToday().length,
-      overdue: getOverdueOrders().length,
-    }),
-    [refreshKey]
-  );
+  const metrics = useQuery(api.orders.metrics);
+  return metrics ?? { atPlant: 0, dueToday: 0, overdue: 0 };
 }
 
 export function useReschedule() {

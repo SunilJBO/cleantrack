@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { GlassCard } from "../ui/glass-card";
 import { ScannerInput } from "../ui/scanner-input";
 import { Input } from "../ui/input";
@@ -8,7 +10,6 @@ import { DatePicker } from "../ui/date-picker";
 import { Button } from "../ui/button";
 import { PhotoUpload } from "../ui/photo-upload";
 import { ITEM_TYPES } from "../../lib/constants";
-import { addOrder, addItems, addLog } from "../../data";
 import { useAuth } from "../../hooks/use-auth";
 
 interface NewItem {
@@ -25,6 +26,10 @@ export function OrderEntryPage() {
   const [dueDate, setDueDate] = useState("");
   const [items, setItems] = useState<NewItem[]>([{ type: "Shirt", notes: "", initialPhotos: [] }]);
 
+  const createOrder = useMutation(api.orders.create);
+  const createItems = useMutation(api.items.createBatch);
+  const createLog = useMutation(api.logs.create);
+
   const addItem = () => setItems([...items, { type: "Shirt", notes: "", initialPhotos: [] }]);
 
   const removeItem = (index: number) =>
@@ -33,8 +38,8 @@ export function OrderEntryPage() {
   const updateItem = (index: number, field: keyof NewItem, value: string | string[]) =>
     setItems(items.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
 
-  const handleSubmit = () => {
-    const order = addOrder({
+  const handleSubmit = async () => {
+    const orderId = await createOrder({
       invoiceNumber: invoiceNumber.toUpperCase().trim(),
       customerName,
       dueDate: new Date(dueDate).getTime(),
@@ -43,21 +48,21 @@ export function OrderEntryPage() {
       itemCount: items.length,
     });
 
-    addItems(
-      items.map((item) => ({
-        orderId: order._id,
+    await createItems({
+      items: items.map((item) => ({
+        orderId,
         type: item.type,
         initialPhotos: item.initialPhotos,
         plantPhotos: [],
         completionPhotos: [],
         notes: item.notes,
         defects: [],
-      }))
-    );
+      })),
+    });
 
     if (currentStaff) {
-      addLog({
-        orderId: order._id,
+      await createLog({
+        orderId,
         staffId: currentStaff._id,
         action: "created",
         timestamp: Date.now(),
@@ -65,7 +70,7 @@ export function OrderEntryPage() {
       });
     }
 
-    navigate(`/orders/${order._id}`);
+    navigate(`/orders/${orderId}`);
   };
 
   return (

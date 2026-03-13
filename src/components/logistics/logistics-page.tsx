@@ -1,20 +1,24 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Truck, ArrowRight, Check } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { GlassCard } from "../ui/glass-card";
 import { Button } from "../ui/button";
 import { ScannerInput } from "../ui/scanner-input";
 import { Badge } from "../ui/badge";
 import { useOrders } from "../../hooks/use-orders";
 import { useAuth } from "../../hooks/use-auth";
-import { updateOrderStatus, addLog } from "../../data";
 import { cn } from "../../lib/utils";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 type Mode = "transfer" | "delivery";
 
 export function LogisticsPage() {
   const navigate = useNavigate();
   const { currentStaff } = useAuth();
+  const updateOrderStatus = useMutation(api.orders.updateStatus);
+  const createLog = useMutation(api.logs.create);
   const [mode, setMode] = useState<Mode>("transfer");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [scanValue, setScanValue] = useState("");
@@ -54,23 +58,23 @@ export function LogisticsPage() {
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     const newStatus = mode === "transfer" ? "transfer_to_plant" : "returning_to_store";
     const location = "In Transit";
     const action = mode === "transfer" ? "transferred_out" : "collected_from_plant";
 
-    selectedIds.forEach((orderId) => {
-      updateOrderStatus(orderId, newStatus, location);
+    for (const orderId of selectedIds) {
+      await updateOrderStatus({ id: orderId as Id<"orders">, status: newStatus, location });
       if (currentStaff) {
-        addLog({
-          orderId,
+        await createLog({
+          orderId: orderId as Id<"orders">,
           staffId: currentStaff._id,
           action,
           timestamp: Date.now(),
           location,
         });
       }
-    });
+    }
 
     setCompleted(true);
     setTimeout(() => {

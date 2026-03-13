@@ -1,31 +1,32 @@
 import { useState } from "react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { Modal } from "../ui/modal";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { useAuth } from "../../hooks/use-auth";
-import { useDataRefresh } from "../../context/data-refresh-context";
-import { updateItemDefect, addLog } from "../../data";
-import type { Item } from "../../types";
 
 interface DefectModalProps {
-  item: Item;
+  item: Doc<"items">;
   orderId: string;
   onClose: () => void;
 }
 
 export function DefectModal({ item, orderId, onClose }: DefectModalProps) {
   const { currentStaff } = useAuth();
-  const { refresh } = useDataRefresh();
+  const addDefect = useMutation(api.items.addDefect);
+  const createLog = useMutation(api.logs.create);
   const [defectText, setDefectText] = useState("");
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!defectText.trim()) return;
 
-    updateItemDefect(item._id, defectText.trim());
+    await addDefect({ id: item._id, defect: defectText.trim() });
 
     if (currentStaff) {
-      addLog({
-        orderId,
+      await createLog({
+        orderId: orderId as Id<"orders">,
         staffId: currentStaff._id,
         action: "defect_noted",
         timestamp: Date.now(),
@@ -34,7 +35,6 @@ export function DefectModal({ item, orderId, onClose }: DefectModalProps) {
       });
     }
 
-    refresh();
     onClose();
   };
 
